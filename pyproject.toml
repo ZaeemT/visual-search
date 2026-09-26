@@ -1,0 +1,26 @@
+[project]
+name = "my-fastapi-boilerplate"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "anyio>=4.13.0",
+    "bcrypt>=5.0.0",
+    "datasets>=5.0.1",
+    "fastapi[standard]>=0.136.0",
+    "httpx>=0.28.1",
+    "motor>=3.7.1",
+    "passlib>=1.7.4",
+    "pillow>=12.3.0",
+    "pydantic>=2.13.2",
+    "pydantic-settings>=2.13.1",
+    "pyjwt>=2.12.1",
+    "pymongo>=4.16.0",
+    "python-dotenv>=1.2.2",
+    "starlette>=1.0.0",
+    "uvicorn>=0.44.0",
+    "uvloop>=0.22.1",
+    "watchfiles>=1.1.1",
+    "websockets>=16.0",
+]
