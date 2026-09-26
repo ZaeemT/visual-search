@@ -176,3 +176,6 @@ pyrightconfig.json
 
 .idea
 .DS_Store
+
+# Project data: raw shards, extracted catalogue, embeddings, samples
+data/
