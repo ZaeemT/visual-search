@@ -22,6 +22,18 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = Field(default="HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30)  # Token expiration time (minutes)
 
+    # Visual search configuration
+    # Switching the embedding model is this one setting: the index directory,
+    # the loaded weights and the compatibility check all follow from it.
+    EMBEDDING_MODEL: str = Field(default="marqo-fashionsiglip")
+    INDEX_ROOT: Path = Field(default=Path("data/index"))
+    CATALOGUE_DIR: Path = Field(default=Path("data/catalogue"))
+    EMBEDDING_DEVICE: Optional[str] = Field(default=None)  # None = auto (mps/cuda/cpu)
+    SEARCH_TOP_K_DEFAULT: int = Field(default=10)
+    SEARCH_TOP_K_MAX: int = Field(default=50)
+    SEARCH_MAX_UPLOAD_BYTES: int = Field(default=15 * 1024 * 1024)
+    SEARCH_WARMUP_QUERIES: int = Field(default=2)
+
     # Email server
     MAIL_SERVER: Optional[str] = Field(default=None)
     MAIL_PORT: Optional[int] = Field(default=None)

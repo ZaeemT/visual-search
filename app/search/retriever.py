@@ -123,8 +123,15 @@ class Retriever:
             )
         return cls(embedder, index, catalogue)
 
-    def search(self, image: Image.Image, top_k: int = 5) -> SearchResponse:
-        """Embed the query, score it against the catalogue, return the top K."""
+    def search(
+        self, image: Image.Image, top_k: int = 5, preprocess_ms: float = 0.0
+    ) -> SearchResponse:
+        """Embed the query, score it against the catalogue, return the top K.
+
+        `preprocess_ms` carries the cleanup cost measured by the caller, so the
+        reported timings cover the whole request rather than starting after the
+        work the caller already did.
+        """
         started = time.perf_counter()
         vector = self.embedder.embed_images([image])[0]
         embedded = time.perf_counter()
@@ -143,19 +150,25 @@ class Retriever:
             for hit in hits
         ]
 
+        embed_ms = (embedded - started) * 1000
+        search_ms = (searched - embedded) * 1000
         return SearchResponse(
             results=results,
             timings_ms={
-                "embed": round((embedded - started) * 1000, 2),
-                "search": round((searched - embedded) * 1000, 2),
-                "total": round((searched - started) * 1000, 2),
+                "preprocess": round(preprocess_ms, 2),
+                "embed": round(embed_ms, 2),
+                "search": round(search_ms, 2),
+                "total": round(preprocess_ms + embed_ms + search_ms, 2),
             },
             catalogue_size=self.index.size,
         )
 
     def search_bytes(self, data: bytes, top_k: int = 5) -> SearchResponse:
         """Convenience for callers holding raw upload bytes."""
-        return self.search(load_query_image(data), top_k=top_k)
+        started = time.perf_counter()
+        image = load_query_image(data)
+        preprocess_ms = (time.perf_counter() - started) * 1000
+        return self.search(image, top_k=top_k, preprocess_ms=preprocess_ms)
 
 
 def _only_index(root: Path) -> str:

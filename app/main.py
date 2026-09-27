@@ -8,6 +8,8 @@ from .core.exceptions import BaseAPIException, NotFoundException, BadRequestExce
 from .core.responses import ErrorResponse, ServiceResponse
 from .modules.users.controller import router as user_router
 from .modules.auth.controller import router as auth_router
+from .modules.search.controller import router as search_router
+from .modules.search.service import SearchService
 import logging
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -20,6 +22,18 @@ async def lifespan(app: FastAPI):
     Connects to the database on startup and closes the connection on shutdown.
     """
     await database.connect_to_mongodb()
+
+    # Load the search index once, here, rather than per request: model weights
+    # onto the GPU, the embedding matrix and the catalogue metadata into memory,
+    # then a couple of warm-up queries so the first real request is not the slow
+    # one. Failure is logged and left non-fatal — the rest of the API still
+    # serves, and /search returns 503 with the reason.
+    try:
+        app.state.search_service = SearchService.load()
+    except Exception as e:
+        app.state.search_service = None
+        logger.error("search index failed to load: %s", e)
+
     yield
     await database.close_mongodb_connection()
 
@@ -52,6 +66,7 @@ async def base_api_exception_handler(request, exc: BaseAPIException):
 
 app.include_router(user_router, prefix="/v1/users", tags=["users"])
 app.include_router(auth_router, prefix="/v1/auth", tags=["auth"])
+app.include_router(search_router, prefix="/search", tags=["search"])
 
 
 @app.get("/")
