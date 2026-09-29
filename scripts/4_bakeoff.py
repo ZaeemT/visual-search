@@ -35,7 +35,7 @@ from app.search.embedders import MODELS, get_embedder  # noqa: E402
 CATALOGUE = Path("data/catalogue")
 QUERIES = Path("data/queries")
 EMBED_DIR = Path("data/embeddings")
-REPORT = Path("data/bakeoff")
+REPORT = Path("metrics/bakeoff")
 
 
 def load_set(directory: Path) -> list[dict]:

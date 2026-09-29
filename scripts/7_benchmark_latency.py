@@ -22,7 +22,7 @@ ever was.
 Usage:
     python scripts/7_benchmark_latency.py
     python scripts/7_benchmark_latency.py --queries 20 --repeats 5 --top-k 10
-    python scripts/7_benchmark_latency.py --json data/bench/latency.json
+    python scripts/7_benchmark_latency.py --json metrics/bench/latency.json
 """
 
 import argparse
