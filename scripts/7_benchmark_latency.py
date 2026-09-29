@@ -35,7 +35,7 @@ from pathlib import Path
 import httpx
 
 QUERY_DIR = Path("data/queries/images")
-DEFAULT_URL = "http://127.0.0.1:8077"
+DEFAULT_URL = "http://127.0.0.1:8000"
 
 
 def percentile(values: list[float], fraction: float) -> float:
