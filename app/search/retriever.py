@@ -24,6 +24,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 from app.search.embedders import MODELS, get_embedder
 from app.search.index import INDEX_ROOT, VectorIndex, index_dir
+from app.search.signals import QuerySignals, dominant_colors
 
 CATALOGUE = Path("data/catalogue")
 
@@ -86,6 +87,13 @@ class SearchResponse:
     results: list[Result]
     timings_ms: dict
     catalogue_size: int
+    query_signals: QuerySignals | None = None
+
+
+# How many category names to offer the zero-shot classifier. The catalogue has
+# ~870 distinct names, but the long tail is mostly near-synonyms that only add
+# noise; the head covers the large majority of items.
+CATEGORY_VOCAB_SIZE = 150
 
 
 class Retriever:
@@ -95,6 +103,38 @@ class Retriever:
         self.embedder = embedder
         self.index = index
         self.catalogue = catalogue
+        self.category_names, self.category_vectors = self._build_category_vocab()
+
+    def _build_category_vocab(self) -> tuple[list[str], np.ndarray]:
+        """Embed the common category names once, for zero-shot classification.
+
+        This is what lets an explanation say the photo "looks like a sari": the
+        claim comes from the model comparing the uploaded image against category
+        names, not from the retrieved item's own label — which would make the
+        comparison circular.
+        """
+        counts: dict[str, int] = {}
+        for item in self.catalogue.values():
+            name = (item.get("name") or "").strip().lower()
+            if name:
+                counts[name] = counts.get(name, 0) + 1
+
+        names = sorted(counts, key=counts.get, reverse=True)[:CATEGORY_VOCAB_SIZE]
+        if not names:
+            return [], np.empty((0, self.index.dim), dtype=np.float32)
+        return names, self.embedder.embed_texts(names)
+
+    def predict_category(self, vector: np.ndarray, min_score: float = 0.05) -> str | None:
+        """The category name whose text embedding is closest to the image.
+
+        Returns None when nothing scores meaningfully, so a weak guess is left
+        unsaid rather than asserted.
+        """
+        if not self.category_names:
+            return None
+        scores = self.category_vectors @ vector
+        best = int(np.argmax(scores))
+        return self.category_names[best] if scores[best] >= min_score else None
 
     @classmethod
     def open(
@@ -152,6 +192,15 @@ class Retriever:
 
         embed_ms = (embedded - started) * 1000
         search_ms = (searched - embedded) * 1000
+
+        # Query-side signals for the explanation: colours measured from the
+        # pixels, category predicted by the model. This reuses the vector that
+        # was already computed, so the classification costs one dot product.
+        signals = QuerySignals(
+            dominant_colors=dominant_colors(image),
+            predicted_category=self.predict_category(vector),
+        )
+
         return SearchResponse(
             results=results,
             timings_ms={
@@ -161,6 +210,7 @@ class Retriever:
                 "total": round(preprocess_ms + embed_ms + search_ms, 2),
             },
             catalogue_size=self.index.size,
+            query_signals=signals,
         )
 
     def search_bytes(self, data: bytes, top_k: int = 5) -> SearchResponse:

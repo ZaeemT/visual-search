@@ -34,6 +34,14 @@ class Settings(BaseSettings):
     SEARCH_MAX_UPLOAD_BYTES: int = Field(default=15 * 1024 * 1024)
     SEARCH_WARMUP_QUERIES: int = Field(default=2)
 
+    # Explanations. The sentence is assembled in code from measured signals;
+    # the LLM only translates the category name into English. Turning it off
+    # keeps the explanation, with the category in its original wording.
+    EXPLAIN_WITH_LLM: bool = Field(default=True)
+    OLLAMA_MODEL: str = Field(default="llama3.2:1b")
+    OLLAMA_HOST: str = Field(default="http://127.0.0.1:11434")
+    OLLAMA_TIMEOUT: float = Field(default=10.0)
+
     # Email server
     MAIL_SERVER: Optional[str] = Field(default=None)
     MAIL_PORT: Optional[int] = Field(default=None)

@@ -16,15 +16,18 @@ from pathlib import Path
 from PIL import Image
 
 from ...core.config import get_settings
+from ...search.explain import Explainer
 from ...search.retriever import Retriever
+from ...search.signals import QuerySignals, build_match_signals
 from .dto import IndexInfo, QueryEcho, SearchResponse, SearchResult, Timings
 
 logger = logging.getLogger(__name__)
 
 
 class SearchService:
-    def __init__(self, retriever: Retriever):
+    def __init__(self, retriever: Retriever, explainer: Explainer):
         self.retriever = retriever
+        self.explainer = explainer
 
     @classmethod
     def load(cls) -> "SearchService":
@@ -50,7 +53,21 @@ class SearchService:
             time.perf_counter() - started,
         )
 
-        service = cls(retriever)
+        explainer = Explainer(
+            model=settings.OLLAMA_MODEL,
+            host=settings.OLLAMA_HOST,
+            timeout=settings.OLLAMA_TIMEOUT,
+            enabled=settings.EXPLAIN_WITH_LLM,
+        )
+        if settings.EXPLAIN_WITH_LLM:
+            logger.info(
+                "explanations: %s",
+                f"ollama {settings.OLLAMA_MODEL} (category translation)"
+                if explainer.available()
+                else "original category names (ollama unreachable)",
+            )
+
+        service = cls(retriever, explainer)
         service._warm_up(settings.SEARCH_WARMUP_QUERIES)
         return service
 
@@ -77,7 +94,14 @@ class SearchService:
         explanations: list[str | None] = [None] * len(response.results)
         if explain:
             started = time.perf_counter()
-            explanations = [self._explain(r) for r in response.results]
+            query_signals = response.query_signals or QuerySignals()
+            # Signals first, wording second: the sentence is assembled from
+            # these facts, so it can only say what they contain.
+            signals = [
+                build_match_signals(query_signals, r.metadata, r.score)
+                for r in response.results
+            ]
+            explanations = self.explainer.explain_many(signals)
             explain_ms = round((time.perf_counter() - started) * 1000, 2)
 
         results = [
@@ -109,15 +133,6 @@ class SearchService:
                 total=round(timings["total"] + explain_ms, 2),
             ),
         )
-
-    def _explain(self, result) -> str:
-        """Placeholder explanation.
-
-        Replaced in the next step by text grounded in real signals — the
-        annotated colours and category, and how close the match actually is.
-        Deliberately not a restatement of the product listing.
-        """
-        return f"Placeholder: matched on visual similarity to your photo."
 
     def image_path(self, item_id: str) -> Path | None:
         """The file for a catalogue ID, or None if that ID is not in the catalogue.
